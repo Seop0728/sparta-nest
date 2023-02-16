@@ -4,52 +4,67 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Article } from './article.entiy';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class BoardService {
-  private articles = [];
+  constructor(
+    @InjectRepository(Article) private articleRepository: Repository<Article>,
+  ) {}
 
-  private articlePasswords = new Map();
-
-  getArticles() {
-    return this.articles;
+  async getArticles() {
+    await this.articleRepository.find({
+      where: { deletedAt: null },
+      select: ['id', 'author', 'title', 'createdAt'],
+    });
   }
 
-  getArticleById(id: number) {
-    return this.articles.find((article) => {
-      return article.id === id;
+  async getArticleById(id: number) {
+    return await this.articleRepository.findOne({
+      where: { id, deletedAt: null },
+      select: ['author', 'title', 'content', 'createdAt', 'updatedAt'],
     });
   }
 
   createArticle(title: string, content: string, password: number) {
-    const articleId = this.articles.length + 1;
-    this.articles.push({ id: articleId, title, content });
-    this.articlePasswords.set(articleId, password);
-    return articleId;
+    this.articleRepository.insert({
+      author: 'test',
+      title,
+      content,
+      password: password.toString(),
+    });
   }
 
-  updateArticle(id: number, title: string, content: string, password: number) {
-    if (this.articlePasswords.get(id) !== password) {
-      throw new UnauthorizedException(
-        `Article password is not correct. id: ${id}`,
-      );
-    }
+  async updateArticle(
+    id: number,
+    title: string,
+    content: string,
+    password: number,
+  ) {
+    await this.veriyPassword(id, password);
 
-    const article = this.getArticleById(id);
+    await this.articleRepository.update(id, { title, content });
+  }
+
+  async deleteArticle(id: number, password: number) {
+    await this.veriyPassword(id, password);
+
+    await this.articleRepository.softDelete(id);
+  }
+
+  private async veriyPassword(id: number, password: number) {
+    const article = await this.articleRepository.findOne({
+      where: { id, deletedAt: null },
+      select: ['password'],
+    });
+
     if (_.isNil(article)) {
       throw new NotFoundException(`Article not found. id: ${id}`);
     }
-
-    article.title = title;
-    article.content = content;
-  }
-
-  deleteArticle(id: number, password: number) {
-    if (this.articlePasswords.get(id) !== password) {
-      throw new UnauthorizedException('Password is not correct. id: ' + id);
+    if (article.password !== password.toString()) {
+      throw new UnauthorizedException(`password is not corrected id: ${id}`);
     }
-    this.articles = this.articles.filter((article) => {
-      return article.id !== id;
-    });
   }
 }
