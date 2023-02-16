@@ -15,7 +15,7 @@ export class BoardService {
   ) {}
 
   async getArticles() {
-    await this.articleRepository.find({
+    return await this.articleRepository.find({
       where: { deletedAt: null },
       select: ['id', 'author', 'title', 'createdAt'],
     });
@@ -29,7 +29,7 @@ export class BoardService {
   }
 
   createArticle(title: string, content: string, password: number) {
-    this.articleRepository.insert({
+    return this.articleRepository.insert({
       author: 'test',
       title,
       content,
